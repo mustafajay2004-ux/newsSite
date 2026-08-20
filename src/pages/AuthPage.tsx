@@ -18,16 +18,11 @@ export default function AuthPage() {
       const { error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          data: { full_name: fullName },
-        },
+        options: { data: { full_name: fullName } },
       });
       if (error) setError(error.message);
     } else {
-      const { error } = await supabase.auth.signInWithPassword({
-        email,
-        password,
-      });
+      const { error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) setError(error.message);
     }
 
@@ -38,34 +33,17 @@ export default function AuthPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
       <div className="w-full max-w-sm bg-white rounded-xl shadow-sm border border-gray-200 p-8">
         <h1 className="text-2xl font-semibold text-center mb-6">{mode === "login" ? "Connexion" : "Créer un compte"}</h1>
-
         <form onSubmit={handleSubmit} className="space-y-4">
           {mode === "signup" && (
-            <input
-              type="text"
-              placeholder="Nom complet"
-              value={fullName}
-              onChange={(e) => setFullName(e.target.value)}
-              required
-              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-            />
+            <input type="text" placeholder="Nom complet" value={fullName} onChange={(e) => setFullName(e.target.value)} required className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
           )}
-          <input
-            type="email"
-            placeholder="Email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-          <input
-            type="password"
-            placeholder="Mot de passe"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            minLength={6}
-            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
-          />
-
-          {error && <p className="text-sm
+          <input type="email" placeholder="Email" value={email} onChange={(e) => setEmail(e.target.value)} required className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          <input type="password" placeholder="Mot de passe" value={password} onChange={(e) => setPassword(e.target.value)} required minLength={6} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+          {error && <p className="text-sm text-red-600">{error}</p>}
+          <button type="submit" disabled={loading} className="w-full bg-blue-600 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50">{loading ? "Chargement..." : mode === "login" ? "Se connecter" : "S'inscrire"}</button>
+        </form>
+        <p className="text-center text-sm text-gray-500 mt-4">{mode === "login" ? "Pas encore de compte ?" : "Déjà un compte ?"} <button onClick={() => setMode(mode === "login" ? "signup" : "login")} className="text-blue-600 font-medium">{mode === "login" ? "S'inscrire" : "Se connecter"}</button></p>
+      </div>
+    </div>
+  );
+}
