@@ -37,4 +37,35 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
       <div className="w-full max-w-sm bg-white rounded-xl shadow-sm border border-gray-200 p-8">
-        <h1 className="text-2xl font-semibold
+        <h1 className="text-2xl font-semibold text-center mb-6">{mode === "login" ? "Connexion" : "Créer un compte"}</h1>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          {mode === "signup" && (
+            <input
+              type="text"
+              placeholder="Nom complet"
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              required
+              className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+            />
+          )}
+          <input
+            type="email"
+            placeholder="Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            required
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+          <input
+            type="password"
+            placeholder="Mot de passe"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            required
+            minLength={6}
+            className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          />
+
+          {error && <p className="text-sm
