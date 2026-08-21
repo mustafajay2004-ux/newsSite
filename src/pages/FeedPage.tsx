@@ -1,54 +1,21 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, ImageIcon,
   Link2, Send, TrendingUp, Trophy, Calendar, Users, Plus, MapPin, Clock
 } from "lucide-react";
+import { supabase } from "../lib/supabase";
 
-const posts = [
-  {
-    id: 1,
-    author: "Sarah Dupont",
-    role: "M2 Cybersécurité",
-    avatar: "https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=80&h=80&fit=crop&auto=format",
-    time: "Il y a 2h",
-    content: "Je viens de terminer mon projet de fin d'année sur la détection d'intrusion par Machine Learning. Les résultats sont bluffants — 97,4% de précision sur le dataset NSL-KDD. Je partage le rapport complet dans la section Ressources du groupe Cybersécurité !",
-    likes: 48,
-    comments: 12,
-    shares: 7,
-    liked: false,
-    saved: false,
-    tags: ["#Cybersécurité", "#MachineLearning"],
-  },
-  {
-    id: 2,
-    author: "Lucas Bernard",
-    role: "L3 Informatique",
-    avatar: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=80&h=80&fit=crop&auto=format",
-    time: "Il y a 4h",
-    content: "Quelqu'un aurait des ressources sur les architectures microservices avec Docker et Kubernetes ? Je prépare mon stage et j'aimerais avoir des bases solides avant de commencer. Merci d'avance la communauté !",
-    likes: 23,
-    comments: 18,
-    shares: 3,
-    liked: true,
-    saved: true,
-    tags: ["#DevOps", "#Stage"],
-  },
-  {
-    id: 3,
-    author: "Emma Leroy",
-    role: "M1 Data Science",
-    avatar: "https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=80&h=80&fit=crop&auto=format",
-    time: "Il y a 6h",
-    content: "Rappel : le hackathon DataFest 2026 commence ce vendredi à 18h en salle B204 ! On cherche encore des équipiers pour former une équipe de 4. Compétences recherchées : Python, visualisation de données, sens du storytelling. Rejoignez-nous !",
-    image: "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?w=700&h=350&fit=crop&auto=format",
-    likes: 91,
-    comments: 34,
-    shares: 22,
-    liked: false,
-    saved: false,
-    tags: ["#Hackathon", "#DataScience", "#Événement"],
-  },
-];
+interface Post {
+  id: string;
+  content: string;
+  image_url: string | null;
+  created_at: string;
+  profiles: {
+    full_name: string | null;
+    avatar_url: string | null;
+    role: string | null;
+  } | null;
+}
 
 const groups = [
   { name: "Dev Web M1", members: 156, color: "from-indigo-400 to-indigo-600" },
@@ -70,10 +37,26 @@ const topContributors = [
   { name: "Alex Martin", score: 1248, avatar: "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=40&h=40&fit=crop&auto=format", rank: 4 },
 ];
 
-function PostCard({ post }: { post: typeof posts[0] }) {
-  const [liked, setLiked] = useState(post.liked);
-  const [saved, setSaved] = useState(post.saved);
-  const [likes, setLikes] = useState(post.likes);
+function timeAgo(dateString: string): string {
+  const diffMs = Date.now() - new Date(dateString).getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "À l'instant";
+  if (diffMin < 60) return `Il y a ${diffMin} min`;
+  const diffH = Math.floor(diffMin / 60);
+  if (diffH < 24) return `Il y a ${diffH}h`;
+  const diffD = Math.floor(diffH / 24);
+  return `Il y a ${diffD}j`;
+}
+
+function PostCard({ post }: { post: Post }) {
+  const [liked, setLiked] = useState(false);
+  const [saved, setSaved] = useState(false);
+  const [likes, setLikes] = useState(0);
+
+  const authorName = post.profiles?.full_name || "Utilisateur";
+  const authorRole = post.profiles?.role || "";
+  const authorAvatar = post.profiles?.avatar_url ||
+    "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&auto=format";
 
   return (
     <article className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
@@ -81,10 +64,10 @@ function PostCard({ post }: { post: typeof posts[0] }) {
         {/* Author */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <img src={post.avatar} alt={post.author} className="w-11 h-11 rounded-xl object-cover" />
+            <img src={authorAvatar} alt={authorName} className="w-11 h-11 rounded-xl object-cover" />
             <div>
-              <p className="font-semibold text-gray-900 text-sm">{post.author}</p>
-              <p className="text-xs text-slate-500">{post.role} · {post.time}</p>
+              <p className="font-semibold text-gray-900 text-sm">{authorName}</p>
+              <p className="text-xs text-slate-500">{authorRole} · {timeAgo(post.created_at)}</p>
             </div>
           </div>
           <button className="w-8 h-8 rounded-xl flex items-center justify-center text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-all">
@@ -95,26 +78,17 @@ function PostCard({ post }: { post: typeof posts[0] }) {
         {/* Content */}
         <p className="text-slate-700 text-sm leading-relaxed mb-4">{post.content}</p>
 
-        {/* Tags */}
-        {post.tags && (
-          <div className="flex flex-wrap gap-2 mb-4">
-            {post.tags.map((tag) => (
-              <span key={tag} className="text-xs font-medium text-indigo-600 bg-indigo-50 px-2.5 py-1 rounded-lg">{tag}</span>
-            ))}
-          </div>
-        )}
-
         {/* Image */}
-        {post.image && (
+        {post.image_url && (
           <div className="rounded-xl overflow-hidden mb-4 bg-slate-100">
-            <img src={post.image} alt="Publication" className="w-full h-48 object-cover" />
+            <img src={post.image_url} alt="Publication" className="w-full h-48 object-cover" />
           </div>
         )}
 
         {/* Stats */}
         <div className="flex items-center justify-between text-xs text-slate-400 pb-4 border-b border-slate-100">
           <span>{likes} réactions</span>
-          <span>{post.comments} commentaires · {post.shares} partages</span>
+          <span>0 commentaires · 0 partages</span>
         </div>
       </div>
 
@@ -151,6 +125,45 @@ function PostCard({ post }: { post: typeof posts[0] }) {
 }
 
 export default function FeedPage() {
+  const [posts, setPosts] = useState<Post[]>([]);
+  const [newPostContent, setNewPostContent] = useState("");
+  const [publishing, setPublishing] = useState(false);
+  const [showCompose, setShowCompose] = useState(false);
+
+  async function loadPosts() {
+    const { data } = await supabase
+      .from("posts")
+      .select("id, content, image_url, created_at, profiles(full_name, avatar_url, role)")
+      .order("created_at", { ascending: false });
+
+    setPosts((data as unknown as Post[]) || []);
+  }
+
+  useEffect(() => {
+    loadPosts();
+  }, []);
+
+  async function handlePublish() {
+    if (!newPostContent.trim()) return;
+    setPublishing(true);
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      setPublishing(false);
+      return;
+    }
+
+    await supabase.from("posts").insert({
+      user_id: user.id,
+      content: newPostContent.trim(),
+    });
+
+    setNewPostContent("");
+    setShowCompose(false);
+    setPublishing(false);
+    loadPosts();
+  }
+
   return (
     <div className="pt-8 pb-12">
       <div className="max-w-screen-xl mx-auto px-6">
@@ -165,9 +178,22 @@ export default function FeedPage() {
                   alt="Alex"
                   className="w-10 h-10 rounded-xl object-cover shrink-0"
                 />
-                <button className="flex-1 h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-400 text-left hover:border-indigo-300 transition-all">
-                  Quoi de neuf, Alex ? Partagez avec votre communauté...
-                </button>
+                {showCompose ? (
+                  <textarea
+                    value={newPostContent}
+                    onChange={(e) => setNewPostContent(e.target.value)}
+                    autoFocus
+                    placeholder="Quoi de neuf, Alex ? Partagez avec votre communauté..."
+                    className="flex-1 min-h-[44px] px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all resize-none"
+                  />
+                ) : (
+                  <button
+                    onClick={() => setShowCompose(true)}
+                    className="flex-1 h-11 px-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-400 text-left hover:border-indigo-300 transition-all"
+                  >
+                    Quoi de neuf, Alex ? Partagez avec votre communauté...
+                  </button>
+                )}
               </div>
               <div className="flex items-center gap-2 pt-3 border-t border-slate-100">
                 <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100 transition-all">
@@ -179,14 +205,24 @@ export default function FeedPage() {
                 <button className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium text-slate-500 hover:bg-slate-100 transition-all">
                   <TrendingUp size={15} className="text-orange-500" /> Sondage
                 </button>
-                <button className="ml-auto flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-500 hover:bg-indigo-600 transition-all">
-                  <Send size={14} /> Publier
+                <button
+                  onClick={handlePublish}
+                  disabled={publishing || !newPostContent.trim()}
+                  className="ml-auto flex items-center gap-2 px-4 py-1.5 rounded-lg text-xs font-semibold text-white bg-indigo-500 hover:bg-indigo-600 transition-all disabled:opacity-50"
+                >
+                  <Send size={14} /> {publishing ? "Publication..." : "Publier"}
                 </button>
               </div>
             </div>
 
             {/* Posts */}
-            {posts.map((post) => <PostCard key={post.id} post={post} />)}
+            {posts.length === 0 ? (
+              <div className="text-center text-sm text-slate-400 py-8">
+                Aucune publication pour l'instant. Soyez le premier à publier !
+              </div>
+            ) : (
+              posts.map((post) => <PostCard key={post.id} post={post} />)
+            )}
           </div>
 
           {/* Right widgets */}
