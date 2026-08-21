@@ -140,53 +140,30 @@ function PostCard({
           </div>
         )}
 
-        <div className="flex items-center gap-4 pb-4 border-b border-slate-100">
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-            <Heart size={16} className={likedByMe ? "text-red-500" : "text-slate-400"} fill={likedByMe ? "currentColor" : "none"} />
-            {likesCount}
-          </span>
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-            <MessageCircle size={16} className="text-slate-400" />
-            {commentsCount}
-          </span>
-          <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
-            <Share2 size={16} className="text-slate-400" />
-            {sharesCount}
-          </span>
-        </div>
       </div>
 
-      <div className="px-6 py-3 flex items-center gap-1 relative">
-        <button
-          onClick={() => onToggleLike(post.id, likedByMe)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${
-            likedByMe ? "text-red-500 bg-red-50" : "text-slate-500 hover:bg-slate-100"
-          }`}
-        >
-          <Heart size={16} fill={likedByMe ? "currentColor" : "none"} />
-          J'aime
-        </button>
+      <div className="px-6 py-3 flex items-center gap-6 relative">
         <button
           onClick={() => onToggleComments(post.id)}
-          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${
-            isExpanded ? "text-indigo-600 bg-indigo-50" : "text-slate-500 hover:bg-slate-100"
+          className={`flex items-center gap-2 text-sm font-medium transition-all ${
+            isExpanded ? "text-indigo-600" : "text-slate-500 hover:text-indigo-600"
           }`}
         >
-          <MessageCircle size={16} />
-          Commenter
+          <MessageCircle size={18} />
+          {commentsCount}
         </button>
 
-        <div className="relative flex-1" ref={shareMenuRef}>
+        <div className="relative" ref={shareMenuRef}>
           <button
             onClick={() => setShowShareMenu(!showShareMenu)}
-            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100 transition-all justify-center"
+            className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-green-600 transition-all"
           >
-            <Share2 size={16} />
-            {copiedFeedback ? "Lien copié !" : "Partager"}
+            <Repeat2 size={18} />
+            {sharesCount}
           </button>
 
           {showShareMenu && (
-            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50 w-56">
+            <div className="absolute bottom-full mb-2 left-0 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50 w-56">
               <button
                 onClick={handleCopyLink}
                 className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-50 text-left text-sm text-slate-700 transition-colors"
@@ -201,7 +178,22 @@ function PostCard({
               </button>
             </div>
           )}
+          {copiedFeedback && (
+            <span className="absolute -top-7 left-0 text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-lg whitespace-nowrap">
+              Lien copié !
+            </span>
+          )}
         </div>
+
+        <button
+          onClick={() => onToggleLike(post.id, likedByMe)}
+          className={`flex items-center gap-2 text-sm font-medium transition-all ${
+            likedByMe ? "text-red-500" : "text-slate-500 hover:text-red-500"
+          }`}
+        >
+          <Heart size={18} fill={likedByMe ? "currentColor" : "none"} />
+          {likesCount}
+        </button>
 
         <button
           onClick={() => setSaved(!saved)}
