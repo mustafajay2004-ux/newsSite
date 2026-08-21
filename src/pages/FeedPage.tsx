@@ -145,20 +145,24 @@ function PostCard({
       <div className="px-6 py-3 flex items-center gap-6 relative">
         <button
           onClick={() => onToggleComments(post.id)}
-          className={`flex items-center gap-2 text-sm font-medium transition-all ${
+          className={`group flex items-center gap-1.5 text-sm font-medium transition-all ${
             isExpanded ? "text-indigo-600" : "text-slate-500 hover:text-indigo-600"
           }`}
         >
-          <MessageCircle size={18} />
+          <span className={`p-2 rounded-full transition-colors ${isExpanded ? "bg-indigo-50" : "group-hover:bg-indigo-50"}`}>
+            <MessageCircle size={18} />
+          </span>
           {commentsCount}
         </button>
 
         <div className="relative" ref={shareMenuRef}>
           <button
             onClick={() => setShowShareMenu(!showShareMenu)}
-            className="flex items-center gap-2 text-sm font-medium text-slate-500 hover:text-green-600 transition-all"
+            className="group flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-green-600 transition-all"
           >
-            <Repeat2 size={18} />
+            <span className="p-2 rounded-full transition-colors group-hover:bg-green-50">
+              <Repeat2 size={18} />
+            </span>
             {sharesCount}
           </button>
 
@@ -187,17 +191,19 @@ function PostCard({
 
         <button
           onClick={() => onToggleLike(post.id, likedByMe)}
-          className={`flex items-center gap-2 text-sm font-medium transition-all ${
+          className={`group flex items-center gap-1.5 text-sm font-medium transition-all ${
             likedByMe ? "text-red-500" : "text-slate-500 hover:text-red-500"
           }`}
         >
-          <Heart size={18} fill={likedByMe ? "currentColor" : "none"} />
+          <span className={`p-2 rounded-full transition-colors ${likedByMe ? "bg-red-50" : "group-hover:bg-red-50"}`}>
+            <Heart size={18} fill={likedByMe ? "currentColor" : "none"} />
+          </span>
           {likesCount}
         </button>
 
         <button
           onClick={() => setSaved(!saved)}
-          className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
+          className={`ml-auto p-2 rounded-full flex items-center justify-center transition-all ${
             saved ? "text-indigo-600 bg-indigo-50" : "text-slate-400 hover:bg-slate-100"
           }`}
         >
