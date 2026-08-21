@@ -17,6 +17,16 @@ interface Post {
   } | null;
 }
 
+interface Comment {
+  id: string;
+  content: string;
+  created_at: string;
+  profiles: {
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+}
+
 const groups = [
   { name: "Dev Web M1", members: 156, color: "from-indigo-400 to-indigo-600" },
   { name: "Cybersécurité", members: 89, color: "from-violet-400 to-violet-600" },
@@ -52,16 +62,31 @@ interface PostCardProps {
   post: Post;
   likesCount: number;
   likedByMe: boolean;
+  commentsCount: number;
   onToggleLike: (postId: string, currentlyLiked: boolean) => void;
+  isExpanded: boolean;
+  comments: Comment[];
+  onToggleComments: (postId: string) => void;
+  onAddComment: (postId: string, text: string) => void;
 }
 
-function PostCard({ post, likesCount, likedByMe, onToggleLike }: PostCardProps) {
+function PostCard({
+  post, likesCount, likedByMe, commentsCount, onToggleLike,
+  isExpanded, comments, onToggleComments, onAddComment,
+}: PostCardProps) {
   const [saved, setSaved] = useState(false);
+  const [commentText, setCommentText] = useState("");
 
   const authorName = post.profiles?.full_name || "Utilisateur";
   const authorRole = post.profiles?.role || "";
   const authorAvatar = post.profiles?.avatar_url ||
     "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&auto=format";
+
+  function submitComment() {
+    if (!commentText.trim()) return;
+    onAddComment(post.id, commentText.trim());
+    setCommentText("");
+  }
 
   return (
     <article className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
@@ -89,7 +114,7 @@ function PostCard({ post, likesCount, likedByMe, onToggleLike }: PostCardProps) 
 
         <div className="flex items-center justify-between text-xs text-slate-400 pb-4 border-b border-slate-100">
           <span>{likesCount} réactions</span>
-          <span>0 commentaires · 0 partages</span>
+          <span>{commentsCount} commentaires · 0 partages</span>
         </div>
       </div>
 
@@ -103,7 +128,12 @@ function PostCard({ post, likesCount, likedByMe, onToggleLike }: PostCardProps) 
           <Heart size={16} fill={likedByMe ? "currentColor" : "none"} />
           J'aime
         </button>
-        <button className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100 transition-all flex-1 justify-center">
+        <button
+          onClick={() => onToggleComments(post.id)}
+          className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${
+            isExpanded ? "text-indigo-600 bg-indigo-50" : "text-slate-500 hover:bg-slate-100"
+          }`}
+        >
           <MessageCircle size={16} />
           Commenter
         </button>
@@ -120,6 +150,47 @@ function PostCard({ post, likesCount, likedByMe, onToggleLike }: PostCardProps) 
           <Bookmark size={16} fill={saved ? "currentColor" : "none"} />
         </button>
       </div>
+
+      {isExpanded && (
+        <div className="px-6 pb-5 border-t border-slate-100 pt-4">
+          <div className="space-y-3 mb-4">
+            {comments.length === 0 ? (
+              <p className="text-xs text-slate-400">Aucun commentaire pour l'instant.</p>
+            ) : (
+              comments.map((c) => (
+                <div key={c.id} className="flex items-start gap-2.5">
+                  <img
+                    src={c.profiles?.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=40&h=40&fit=crop&auto=format"}
+                    alt={c.profiles?.full_name || "Utilisateur"}
+                    className="w-8 h-8 rounded-full object-cover shrink-0"
+                  />
+                  <div className="bg-slate-50 rounded-xl px-3 py-2 flex-1">
+                    <p className="text-xs font-semibold text-gray-900">{c.profiles?.full_name || "Utilisateur"}</p>
+                    <p className="text-sm text-slate-700">{c.content}</p>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              value={commentText}
+              onChange={(e) => setCommentText(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && submitComment()}
+              placeholder="Écrire un commentaire..."
+              className="flex-1 h-9 px-3 bg-slate-50 border border-slate-200 rounded-lg text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
+            />
+            <button
+              onClick={submitComment}
+              disabled={!commentText.trim()}
+              className="w-9 h-9 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white flex items-center justify-center disabled:opacity-50 transition-all"
+            >
+              <Send size={14} />
+            </button>
+          </div>
+        </div>
+      )}
     </article>
   );
 }
@@ -128,6 +199,9 @@ export default function FeedPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [likesByPost, setLikesByPost] = useState<Record<string, number>>({});
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+  const [commentsCountByPost, setCommentsCountByPost] = useState<Record<string, number>>({});
+  const [commentsByPost, setCommentsByPost] = useState<Record<string, Comment[]>>({});
+  const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [newPostContent, setNewPostContent] = useState("");
   const [publishing, setPublishing] = useState(false);
@@ -148,22 +222,31 @@ export default function FeedPage() {
     if (loadedPosts.length === 0) return;
 
     const postIds = loadedPosts.map((p) => p.id);
+
     const { data: likesData } = await supabase
       .from("likes")
       .select("post_id, user_id")
       .in("post_id", postIds);
 
-    const counts: Record<string, number> = {};
+    const likeCounts: Record<string, number> = {};
     const likedByMe = new Set<string>();
     (likesData || []).forEach((like) => {
-      counts[like.post_id] = (counts[like.post_id] || 0) + 1;
-      if (user && like.user_id === user.id) {
-        likedByMe.add(like.post_id);
-      }
+      likeCounts[like.post_id] = (likeCounts[like.post_id] || 0) + 1;
+      if (user && like.user_id === user.id) likedByMe.add(like.post_id);
     });
-
-    setLikesByPost(counts);
+    setLikesByPost(likeCounts);
     setLikedPostIds(likedByMe);
+
+    const { data: commentsData } = await supabase
+      .from("comments")
+      .select("post_id")
+      .in("post_id", postIds);
+
+    const commentCounts: Record<string, number> = {};
+    (commentsData || []).forEach((c) => {
+      commentCounts[c.post_id] = (commentCounts[c.post_id] || 0) + 1;
+    });
+    setCommentsCountByPost(commentCounts);
   }
 
   useEffect(() => {
@@ -186,6 +269,40 @@ export default function FeedPage() {
       setLikedPostIds((prev) => new Set(prev).add(postId));
       setLikesByPost((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
     }
+  }
+
+  async function loadComments(postId: string) {
+    const { data } = await supabase
+      .from("comments")
+      .select("id, content, created_at, profiles(full_name, avatar_url)")
+      .eq("post_id", postId)
+      .order("created_at", { ascending: true });
+
+    setCommentsByPost((prev) => ({ ...prev, [postId]: (data as unknown as Comment[]) || [] }));
+  }
+
+  function handleToggleComments(postId: string) {
+    if (expandedPostId === postId) {
+      setExpandedPostId(null);
+      return;
+    }
+    setExpandedPostId(postId);
+    if (!commentsByPost[postId]) {
+      loadComments(postId);
+    }
+  }
+
+  async function handleAddComment(postId: string, text: string) {
+    if (!currentUserId) return;
+
+    await supabase.from("comments").insert({
+      post_id: postId,
+      user_id: currentUserId,
+      content: text,
+    });
+
+    setCommentsCountByPost((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
+    loadComments(postId);
   }
 
   async function handlePublish() {
@@ -269,7 +386,12 @@ export default function FeedPage() {
                   post={post}
                   likesCount={likesByPost[post.id] || 0}
                   likedByMe={likedPostIds.has(post.id)}
+                  commentsCount={commentsCountByPost[post.id] || 0}
                   onToggleLike={handleToggleLike}
+                  isExpanded={expandedPostId === post.id}
+                  comments={commentsByPost[post.id] || []}
+                  onToggleComments={handleToggleComments}
+                  onAddComment={handleAddComment}
                 />
               ))
             )}
