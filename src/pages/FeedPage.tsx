@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import {
   Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, ImageIcon,
-  Link2, Send, TrendingUp, Trophy, Calendar, Users, Plus, MapPin, Clock
+  Link2, Send, TrendingUp, Trophy, Calendar, Users, Plus, MapPin, Clock, Copy, Repeat2
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
@@ -63,29 +63,57 @@ interface PostCardProps {
   likesCount: number;
   likedByMe: boolean;
   commentsCount: number;
+  sharesCount: number;
   onToggleLike: (postId: string, currentlyLiked: boolean) => void;
   isExpanded: boolean;
   comments: Comment[];
   onToggleComments: (postId: string) => void;
   onAddComment: (postId: string, text: string) => void;
+  onCopyLink: (postId: string) => void;
+  onRepost: (post: Post) => void;
 }
 
 function PostCard({
-  post, likesCount, likedByMe, commentsCount, onToggleLike,
-  isExpanded, comments, onToggleComments, onAddComment,
+  post, likesCount, likedByMe, commentsCount, sharesCount, onToggleLike,
+  isExpanded, comments, onToggleComments, onAddComment, onCopyLink, onRepost,
 }: PostCardProps) {
   const [saved, setSaved] = useState(false);
   const [commentText, setCommentText] = useState("");
+  const [showShareMenu, setShowShareMenu] = useState(false);
+  const [copiedFeedback, setCopiedFeedback] = useState(false);
+  const shareMenuRef = useRef<HTMLDivElement>(null);
 
   const authorName = post.profiles?.full_name || "Utilisateur";
   const authorRole = post.profiles?.role || "";
   const authorAvatar = post.profiles?.avatar_url ||
     "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=80&h=80&fit=crop&auto=format";
 
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (shareMenuRef.current && !shareMenuRef.current.contains(event.target as Node)) {
+        setShowShareMenu(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
   function submitComment() {
     if (!commentText.trim()) return;
     onAddComment(post.id, commentText.trim());
     setCommentText("");
+  }
+
+  function handleCopyLink() {
+    onCopyLink(post.id);
+    setCopiedFeedback(true);
+    setTimeout(() => setCopiedFeedback(false), 2000);
+    setShowShareMenu(false);
+  }
+
+  function handleRepost() {
+    onRepost(post);
+    setShowShareMenu(false);
   }
 
   return (
@@ -114,11 +142,11 @@ function PostCard({
 
         <div className="flex items-center justify-between text-xs text-slate-400 pb-4 border-b border-slate-100">
           <span>{likesCount} réactions</span>
-          <span>{commentsCount} commentaires · 0 partages</span>
+          <span>{commentsCount} commentaires · {sharesCount} partages</span>
         </div>
       </div>
 
-      <div className="px-6 py-3 flex items-center gap-1">
+      <div className="px-6 py-3 flex items-center gap-1 relative">
         <button
           onClick={() => onToggleLike(post.id, likedByMe)}
           className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${
@@ -137,10 +165,34 @@ function PostCard({
           <MessageCircle size={16} />
           Commenter
         </button>
-        <button className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100 transition-all flex-1 justify-center">
-          <Share2 size={16} />
-          Partager
-        </button>
+
+        <div className="relative flex-1" ref={shareMenuRef}>
+          <button
+            onClick={() => setShowShareMenu(!showShareMenu)}
+            className="w-full flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100 transition-all justify-center"
+          >
+            <Share2 size={16} />
+            {copiedFeedback ? "Lien copié !" : "Partager"}
+          </button>
+
+          {showShareMenu && (
+            <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50 w-56">
+              <button
+                onClick={handleCopyLink}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-50 text-left text-sm text-slate-700 transition-colors"
+              >
+                <Copy size={15} /> Copier le lien
+              </button>
+              <button
+                onClick={handleRepost}
+                className="w-full flex items-center gap-2.5 px-4 py-2.5 hover:bg-slate-50 text-left text-sm text-slate-700 transition-colors"
+              >
+                <Repeat2 size={15} /> Repartager sur mon profil
+              </button>
+            </div>
+          )}
+        </div>
+
         <button
           onClick={() => setSaved(!saved)}
           className={`w-9 h-9 rounded-xl flex items-center justify-center transition-all ${
@@ -201,6 +253,7 @@ export default function FeedPage() {
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
   const [commentsCountByPost, setCommentsCountByPost] = useState<Record<string, number>>({});
   const [commentsByPost, setCommentsByPost] = useState<Record<string, Comment[]>>({});
+  const [sharesCountByPost, setSharesCountByPost] = useState<Record<string, number>>({});
   const [expandedPostId, setExpandedPostId] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [newPostContent, setNewPostContent] = useState("");
@@ -247,6 +300,17 @@ export default function FeedPage() {
       commentCounts[c.post_id] = (commentCounts[c.post_id] || 0) + 1;
     });
     setCommentsCountByPost(commentCounts);
+
+    const { data: sharesData } = await supabase
+      .from("shares")
+      .select("post_id")
+      .in("post_id", postIds);
+
+    const shareCounts: Record<string, number> = {};
+    (sharesData || []).forEach((s) => {
+      shareCounts[s.post_id] = (shareCounts[s.post_id] || 0) + 1;
+    });
+    setSharesCountByPost(shareCounts);
   }
 
   useEffect(() => {
@@ -303,6 +367,37 @@ export default function FeedPage() {
 
     setCommentsCountByPost((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
     loadComments(postId);
+  }
+
+  async function handleCopyLink(postId: string) {
+    if (!currentUserId) return;
+
+    try {
+      await navigator.clipboard.writeText(window.location.origin);
+    } catch {
+      // clipboard indisponible, on continue quand même à enregistrer le partage
+    }
+
+    await supabase.from("shares").insert({ post_id: postId, user_id: currentUserId });
+    setSharesCountByPost((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
+  }
+
+  async function handleRepost(post: Post) {
+    if (!currentUserId) return;
+
+    const authorName = post.profiles?.full_name || "un utilisateur";
+    const excerpt = post.content.length > 100 ? post.content.slice(0, 100) + "..." : post.content;
+
+    await supabase.from("posts").insert({
+      user_id: currentUserId,
+      content: `🔁 A partagé la publication de ${authorName} : "${excerpt}"`,
+      shared_from_post_id: post.id,
+    });
+
+    await supabase.from("shares").insert({ post_id: post.id, user_id: currentUserId });
+    setSharesCountByPost((prev) => ({ ...prev, [post.id]: (prev[post.id] || 0) + 1 }));
+
+    loadPosts();
   }
 
   async function handlePublish() {
@@ -387,11 +482,14 @@ export default function FeedPage() {
                   likesCount={likesByPost[post.id] || 0}
                   likedByMe={likedPostIds.has(post.id)}
                   commentsCount={commentsCountByPost[post.id] || 0}
+                  sharesCount={sharesCountByPost[post.id] || 0}
                   onToggleLike={handleToggleLike}
                   isExpanded={expandedPostId === post.id}
                   comments={commentsByPost[post.id] || []}
                   onToggleComments={handleToggleComments}
                   onAddComment={handleAddComment}
+                  onCopyLink={handleCopyLink}
+                  onRepost={handleRepost}
                 />
               ))
             )}
