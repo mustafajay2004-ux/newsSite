@@ -140,6 +140,16 @@ function PostCard({
           </div>
         )}
 
+        <div className="flex items-center gap-4 mb-2">
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+            <Heart size={16} className={likedByMe ? "text-red-500" : "text-slate-400"} fill={likedByMe ? "currentColor" : "none"} />
+            {likesCount}
+          </span>
+          <span className="flex items-center gap-1.5 text-sm font-semibold text-slate-700">
+            <MessageCircle size={16} className="text-slate-400" />
+            {commentsCount}
+          </span>
+        </div>
         <div className="flex items-center justify-between text-xs text-slate-400 pb-4 border-b border-slate-100">
           <span>{likesCount} réactions</span>
           <span>{commentsCount} commentaires · {sharesCount} partages</span>
