@@ -48,10 +48,15 @@ function timeAgo(dateString: string): string {
   return `Il y a ${diffD}j`;
 }
 
-function PostCard({ post }: { post: Post }) {
-  const [liked, setLiked] = useState(false);
+interface PostCardProps {
+  post: Post;
+  likesCount: number;
+  likedByMe: boolean;
+  onToggleLike: (postId: string, currentlyLiked: boolean) => void;
+}
+
+function PostCard({ post, likesCount, likedByMe, onToggleLike }: PostCardProps) {
   const [saved, setSaved] = useState(false);
-  const [likes, setLikes] = useState(0);
 
   const authorName = post.profiles?.full_name || "Utilisateur";
   const authorRole = post.profiles?.role || "";
@@ -61,7 +66,6 @@ function PostCard({ post }: { post: Post }) {
   return (
     <article className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
       <div className="p-6">
-        {/* Author */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
             <img src={authorAvatar} alt={authorName} className="w-11 h-11 rounded-xl object-cover" />
@@ -75,32 +79,28 @@ function PostCard({ post }: { post: Post }) {
           </button>
         </div>
 
-        {/* Content */}
         <p className="text-slate-700 text-sm leading-relaxed mb-4">{post.content}</p>
 
-        {/* Image */}
         {post.image_url && (
           <div className="rounded-xl overflow-hidden mb-4 bg-slate-100">
             <img src={post.image_url} alt="Publication" className="w-full h-48 object-cover" />
           </div>
         )}
 
-        {/* Stats */}
         <div className="flex items-center justify-between text-xs text-slate-400 pb-4 border-b border-slate-100">
-          <span>{likes} réactions</span>
+          <span>{likesCount} réactions</span>
           <span>0 commentaires · 0 partages</span>
         </div>
       </div>
 
-      {/* Actions */}
       <div className="px-6 py-3 flex items-center gap-1">
         <button
-          onClick={() => { setLiked(!liked); setLikes(liked ? likes - 1 : likes + 1); }}
+          onClick={() => onToggleLike(post.id, likedByMe)}
           className={`flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium transition-all flex-1 justify-center ${
-            liked ? "text-red-500 bg-red-50" : "text-slate-500 hover:bg-slate-100"
+            likedByMe ? "text-red-500 bg-red-50" : "text-slate-500 hover:bg-slate-100"
           }`}
         >
-          <Heart size={16} fill={liked ? "currentColor" : "none"} />
+          <Heart size={16} fill={likedByMe ? "currentColor" : "none"} />
           J'aime
         </button>
         <button className="flex items-center gap-2 px-3 py-2 rounded-xl text-sm font-medium text-slate-500 hover:bg-slate-100 transition-all flex-1 justify-center">
@@ -126,22 +126,67 @@ function PostCard({ post }: { post: Post }) {
 
 export default function FeedPage() {
   const [posts, setPosts] = useState<Post[]>([]);
+  const [likesByPost, setLikesByPost] = useState<Record<string, number>>({});
+  const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [newPostContent, setNewPostContent] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
 
   async function loadPosts() {
-    const { data } = await supabase
+    const { data: { user } } = await supabase.auth.getUser();
+    setCurrentUserId(user?.id || null);
+
+    const { data: postsData } = await supabase
       .from("posts")
       .select("id, content, image_url, created_at, profiles(full_name, avatar_url, role)")
       .order("created_at", { ascending: false });
 
-    setPosts((data as unknown as Post[]) || []);
+    const loadedPosts = (postsData as unknown as Post[]) || [];
+    setPosts(loadedPosts);
+
+    if (loadedPosts.length === 0) return;
+
+    const postIds = loadedPosts.map((p) => p.id);
+    const { data: likesData } = await supabase
+      .from("likes")
+      .select("post_id, user_id")
+      .in("post_id", postIds);
+
+    const counts: Record<string, number> = {};
+    const likedByMe = new Set<string>();
+    (likesData || []).forEach((like) => {
+      counts[like.post_id] = (counts[like.post_id] || 0) + 1;
+      if (user && like.user_id === user.id) {
+        likedByMe.add(like.post_id);
+      }
+    });
+
+    setLikesByPost(counts);
+    setLikedPostIds(likedByMe);
   }
 
   useEffect(() => {
     loadPosts();
   }, []);
+
+  async function handleToggleLike(postId: string, currentlyLiked: boolean) {
+    if (!currentUserId) return;
+
+    if (currentlyLiked) {
+      await supabase.from("likes").delete().eq("post_id", postId).eq("user_id", currentUserId);
+      setLikedPostIds((prev) => {
+        const next = new Set(prev);
+        next.delete(postId);
+        return next;
+      });
+      setLikesByPost((prev) => ({ ...prev, [postId]: (prev[postId] || 1) - 1 }));
+    } else {
+      await supabase.from("likes").insert({ post_id: postId, user_id: currentUserId });
+      setLikedPostIds((prev) => new Set(prev).add(postId));
+      setLikesByPost((prev) => ({ ...prev, [postId]: (prev[postId] || 0) + 1 }));
+    }
+  }
 
   async function handlePublish() {
     if (!newPostContent.trim()) return;
@@ -168,9 +213,7 @@ export default function FeedPage() {
     <div className="pt-8 pb-12">
       <div className="max-w-screen-xl mx-auto px-6">
         <div className="grid grid-cols-12 gap-6">
-          {/* Feed central */}
           <div className="col-span-12 lg:col-span-7 xl:col-span-7 space-y-6">
-            {/* Compose */}
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
               <div className="flex items-center gap-3 mb-4">
                 <img
@@ -215,19 +258,24 @@ export default function FeedPage() {
               </div>
             </div>
 
-            {/* Posts */}
             {posts.length === 0 ? (
               <div className="text-center text-sm text-slate-400 py-8">
                 Aucune publication pour l'instant. Soyez le premier à publier !
               </div>
             ) : (
-              posts.map((post) => <PostCard key={post.id} post={post} />)
+              posts.map((post) => (
+                <PostCard
+                  key={post.id}
+                  post={post}
+                  likesCount={likesByPost[post.id] || 0}
+                  likedByMe={likedPostIds.has(post.id)}
+                  onToggleLike={handleToggleLike}
+                />
+              ))
             )}
           </div>
 
-          {/* Right widgets */}
           <div className="col-span-12 lg:col-span-5 xl:col-span-5 space-y-6">
-            {/* Mes Groupes */}
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-gray-900 text-sm">Mes groupes</h3>
@@ -251,7 +299,6 @@ export default function FeedPage() {
               </div>
             </div>
 
-            {/* Événements */}
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-gray-900 text-sm">Prochains événements</h3>
@@ -273,7 +320,6 @@ export default function FeedPage() {
               </div>
             </div>
 
-            {/* Top Contributeurs */}
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-gray-900 text-sm">Top Contributeurs</h3>
