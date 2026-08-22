@@ -32,12 +32,13 @@ interface Comment {
   } | null;
 }
 
-const groups = [
-  { name: "Dev Web M1", members: 156, color: "from-indigo-400 to-indigo-600" },
-  { name: "Cybersécurité", members: 89, color: "from-violet-400 to-violet-600" },
-  { name: "IA & Machine Learning", members: 204, color: "from-indigo-500 to-violet-500" },
-  { name: "Entrepreneurs Campus", members: 67, color: "from-purple-400 to-pink-500" },
-];
+interface Group {
+  id: string;
+  name: string;
+  description: string | null;
+  photo_url: string | null;
+  memberCount: number;
+}
 
 const events = [
   { title: "Hackathon DataFest 2026", date: "Vendredi 22 Août", time: "18h00", location: "Salle B204" },
@@ -276,6 +277,12 @@ export default function FeedPage({ onViewProfile }: FeedPageProps) {
   const [newPostContent, setNewPostContent] = useState("");
   const [publishing, setPublishing] = useState(false);
   const [showCompose, setShowCompose] = useState(false);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [showCreateGroup, setShowCreateGroup] = useState(false);
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDescription, setNewGroupDescription] = useState("");
+  const [newGroupPhoto, setNewGroupPhoto] = useState<File | null>(null);
+  const [creatingGroup, setCreatingGroup] = useState(false);
 
   async function loadPosts() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -438,6 +445,87 @@ export default function FeedPage({ onViewProfile }: FeedPageProps) {
     loadPosts();
   }
 
+  async function loadGroups() {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    const { data: membershipData } = await supabase
+      .from("group_members")
+      .select("groups(id, name, description, photo_url)")
+      .eq("user_id", user.id);
+
+    const myGroups = (membershipData || [])
+      .map((m: any) => m.groups)
+      .filter((g: any) => g !== null);
+
+    if (myGroups.length === 0) {
+      setGroups([]);
+      return;
+    }
+
+    const groupIds = myGroups.map((g: any) => g.id);
+    const { data: allMembers } = await supabase
+      .from("group_members")
+      .select("group_id")
+      .in("group_id", groupIds);
+
+    const counts: Record<string, number> = {};
+    (allMembers || []).forEach((m) => {
+      counts[m.group_id] = (counts[m.group_id] || 0) + 1;
+    });
+
+    setGroups(
+      myGroups.map((g: any) => ({
+        id: g.id,
+        name: g.name,
+        description: g.description,
+        photo_url: g.photo_url,
+        memberCount: counts[g.id] || 0,
+      }))
+    );
+  }
+
+  useEffect(() => {
+    loadGroups();
+  }, []);
+
+  async function handleCreateGroup() {
+    if (!newGroupName.trim() || !currentUserId) return;
+    setCreatingGroup(true);
+
+    let photoUrl: string | null = null;
+
+    if (newGroupPhoto) {
+      const fileExt = newGroupPhoto.name.split(".").pop();
+      const filePath = `${currentUserId}-${Date.now()}.${fileExt}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("group-photos")
+        .upload(filePath, newGroupPhoto);
+
+      if (!uploadError) {
+        const { data: publicUrlData } = supabase.storage
+          .from("group-photos")
+          .getPublicUrl(filePath);
+        photoUrl = publicUrlData.publicUrl;
+      }
+    }
+
+    await supabase.from("groups").insert({
+      name: newGroupName.trim(),
+      description: newGroupDescription.trim() || null,
+      photo_url: photoUrl,
+      created_by: currentUserId,
+    });
+
+    setNewGroupName("");
+    setNewGroupDescription("");
+    setNewGroupPhoto(null);
+    setShowCreateGroup(false);
+    setCreatingGroup(false);
+    loadGroups();
+  }
+
   return (
     <div className="pt-8 pb-12">
       <div className="max-w-screen-xl mx-auto px-6">
@@ -517,23 +605,66 @@ export default function FeedPage({ onViewProfile }: FeedPageProps) {
             <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5">
               <div className="flex items-center justify-between mb-4">
                 <h3 className="font-bold text-gray-900 text-sm">Mes groupes</h3>
-                <button className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 hover:bg-indigo-100 transition-all">
+                <button
+                  onClick={() => setShowCreateGroup(!showCreateGroup)}
+                  className="w-7 h-7 rounded-lg bg-indigo-50 flex items-center justify-center text-indigo-600 hover:bg-indigo-100 transition-all"
+                >
                   <Plus size={14} />
                 </button>
               </div>
+
+              {showCreateGroup && (
+                <div className="mb-4 p-3 bg-slate-50 rounded-xl space-y-2">
+                  <input
+                    type="text"
+                    value={newGroupName}
+                    onChange={(e) => setNewGroupName(e.target.value)}
+                    placeholder="Nom du groupe"
+                    className="w-full h-9 px-3 bg-white border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+                  />
+                  <textarea
+                    value={newGroupDescription}
+                    onChange={(e) => setNewGroupDescription(e.target.value)}
+                    placeholder="Description (optionnel)"
+                    className="w-full min-h-[60px] px-3 py-2 bg-white border border-slate-200 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+                  />
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={(e) => setNewGroupPhoto(e.target.files?.[0] || null)}
+                    className="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-600"
+                  />
+                  <button
+                    onClick={handleCreateGroup}
+                    disabled={creatingGroup || !newGroupName.trim()}
+                    className="w-full h-9 rounded-lg bg-indigo-500 hover:bg-indigo-600 text-white text-sm font-semibold disabled:opacity-50 transition-all"
+                  >
+                    {creatingGroup ? "Création..." : "Créer le groupe"}
+                  </button>
+                </div>
+              )}
+
               <div className="space-y-3">
-                {groups.map((g) => (
-                  <div key={g.name} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-all cursor-pointer">
-                    <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${g.color} flex items-center justify-center shrink-0`}>
-                      <span className="text-white text-xs font-bold">{g.name[0]}</span>
+                {groups.length === 0 ? (
+                  <p className="text-xs text-slate-400 px-2.5">Aucun groupe pour l'instant.</p>
+                ) : (
+                  groups.map((g) => (
+                    <div key={g.id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-all cursor-pointer">
+                      {g.photo_url ? (
+                        <img src={g.photo_url} alt={g.name} className="w-9 h-9 rounded-xl object-cover shrink-0" />
+                      ) : (
+                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-400 to-violet-600 flex items-center justify-center shrink-0">
+                          <span className="text-white text-xs font-bold">{g.name[0]}</span>
+                        </div>
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-semibold text-gray-900 truncate">{g.name}</p>
+                        <p className="text-xs text-slate-500">{g.memberCount} membre{g.memberCount > 1 ? "s" : ""}</p>
+                      </div>
+                      <Users size={14} className="text-slate-300 shrink-0" />
                     </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-semibold text-gray-900 truncate">{g.name}</p>
-                      <p className="text-xs text-slate-500">{g.members} membres</p>
-                    </div>
-                    <Users size={14} className="text-slate-300 shrink-0" />
-                  </div>
-                ))}
+                  ))
+                )}
               </div>
             </div>
 
