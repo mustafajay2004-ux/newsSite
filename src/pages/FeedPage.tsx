@@ -37,8 +37,18 @@ interface Group {
   name: string;
   description: string | null;
   photo_url: string | null;
+  color: string;
   memberCount: number;
 }
+
+const GROUP_COLORS = [
+  { label: "Indigo", value: "from-indigo-400 to-indigo-600" },
+  { label: "Violet", value: "from-violet-400 to-violet-600" },
+  { label: "Rose", value: "from-pink-400 to-pink-600" },
+  { label: "Vert", value: "from-emerald-400 to-emerald-600" },
+  { label: "Orange", value: "from-orange-400 to-orange-600" },
+  { label: "Bleu", value: "from-sky-400 to-sky-600" },
+];
 
 const events = [
   { title: "Hackathon DataFest 2026", date: "Vendredi 22 Août", time: "18h00", location: "Salle B204" },
@@ -282,6 +292,7 @@ export default function FeedPage({ onViewProfile }: FeedPageProps) {
   const [newGroupName, setNewGroupName] = useState("");
   const [newGroupDescription, setNewGroupDescription] = useState("");
   const [newGroupPhoto, setNewGroupPhoto] = useState<File | null>(null);
+  const [newGroupColor, setNewGroupColor] = useState(GROUP_COLORS[0].value);
   const [creatingGroup, setCreatingGroup] = useState(false);
 
   async function loadPosts() {
@@ -451,7 +462,7 @@ export default function FeedPage({ onViewProfile }: FeedPageProps) {
 
     const { data: membershipData } = await supabase
       .from("group_members")
-      .select("groups(id, name, description, photo_url)")
+      .select("groups(id, name, description, photo_url, color)")
       .eq("user_id", user.id);
 
     const myGroups = (membershipData || [])
@@ -480,6 +491,7 @@ export default function FeedPage({ onViewProfile }: FeedPageProps) {
         name: g.name,
         description: g.description,
         photo_url: g.photo_url,
+        color: g.color || GROUP_COLORS[0].value,
         memberCount: counts[g.id] || 0,
       }))
     );
@@ -515,12 +527,14 @@ export default function FeedPage({ onViewProfile }: FeedPageProps) {
       name: newGroupName.trim(),
       description: newGroupDescription.trim() || null,
       photo_url: photoUrl,
+      color: newGroupColor,
       created_by: currentUserId,
     });
 
     setNewGroupName("");
     setNewGroupDescription("");
     setNewGroupPhoto(null);
+    setNewGroupColor(GROUP_COLORS[0].value);
     setShowCreateGroup(false);
     setCreatingGroup(false);
     loadGroups();
@@ -634,6 +648,19 @@ export default function FeedPage({ onViewProfile }: FeedPageProps) {
                     onChange={(e) => setNewGroupPhoto(e.target.files?.[0] || null)}
                     className="w-full text-xs text-slate-500 file:mr-2 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-indigo-50 file:text-indigo-600"
                   />
+                  <div className="flex items-center gap-2 pt-1">
+                    {GROUP_COLORS.map((c) => (
+                      <button
+                        key={c.value}
+                        type="button"
+                        onClick={() => setNewGroupColor(c.value)}
+                        title={c.label}
+                        className={`w-7 h-7 rounded-full bg-gradient-to-br ${c.value} transition-all ${
+                          newGroupColor === c.value ? "ring-2 ring-offset-2 ring-slate-400" : "opacity-70 hover:opacity-100"
+                        }`}
+                      />
+                    ))}
+                  </div>
                   <button
                     onClick={handleCreateGroup}
                     disabled={creatingGroup || !newGroupName.trim()}
@@ -653,7 +680,7 @@ export default function FeedPage({ onViewProfile }: FeedPageProps) {
                       {g.photo_url ? (
                         <img src={g.photo_url} alt={g.name} className="w-9 h-9 rounded-xl object-cover shrink-0" />
                       ) : (
-                        <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-400 to-violet-600 flex items-center justify-center shrink-0">
+                        <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${g.color} flex items-center justify-center shrink-0`}>
                           <span className="text-white text-xs font-bold">{g.name[0]}</span>
                         </div>
                       )}
