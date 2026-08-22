@@ -1,11 +1,12 @@
 import { useState, useEffect, useRef } from "react";
 import { Search, Bell, MessageSquare, ChevronDown } from "lucide-react";
-import type { Page } from "../App";
 import { supabase } from "../lib/supabase";
+import type { Page } from "../App";
 
 interface TopbarProps {
   activePage: Page;
   onNavigate: (page: Page) => void;
+  onViewProfile: (userId: string) => void;
 }
 
 interface ProfileResult {
@@ -14,11 +15,11 @@ interface ProfileResult {
   avatar_url: string | null;
 }
 
-export default function Topbar({ onNavigate }: TopbarProps) {
+export default function Topbar({ onNavigate, onViewProfile }: TopbarProps) {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<ProfileResult[]>([]);
   const [showDropdown, setShowDropdown] = useState(false);
-  const wrapperRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (query.trim().length === 0) {
@@ -34,6 +35,7 @@ export default function Topbar({ onNavigate }: TopbarProps) {
         .limit(5);
 
       setResults(data || []);
+      setShowDropdown(true);
     }, 300);
 
     return () => clearTimeout(timeout);
@@ -41,25 +43,13 @@ export default function Topbar({ onNavigate }: TopbarProps) {
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
-      if (wrapperRef.current && !wrapperRef.current.contains(event.target as Node)) {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
         setShowDropdown(false);
       }
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
-
-  const handleSelectProfile = (id: string) => {
-    setShowDropdown(false);
-    setQuery("");
-    onNavigate("profile");
-  };
-
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && results.length > 0) {
-      handleSelectProfile(results[0].id);
-    }
-  };
 
   return (
     <header className="fixed top-0 left-0 right-0 z-50 h-16 bg-white border-b border-slate-200/80 shadow-sm">
@@ -73,41 +63,41 @@ export default function Topbar({ onNavigate }: TopbarProps) {
         </div>
 
         {/* Search bar */}
-        <div className="flex-1 max-w-xl relative" ref={wrapperRef}>
+        <div className="flex-1 max-w-xl relative" ref={containerRef}>
           <div className="relative">
             <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               value={query}
-              onChange={(e) => {
-                setQuery(e.target.value);
-                setShowDropdown(true);
-              }}
-              onFocus={() => setShowDropdown(true)}
-              onKeyDown={handleKeyDown}
+              onChange={(e) => setQuery(e.target.value)}
+              onFocus={() => query.trim().length > 0 && setShowDropdown(true)}
               placeholder="Rechercher des groupes, ressources, personnes..."
               className="w-full h-10 pl-9 pr-4 bg-slate-50 border border-slate-200 rounded-xl text-sm text-slate-700 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400 transition-all"
             />
           </div>
 
           {showDropdown && query.trim().length > 0 && (
-            <div className="absolute top-12 left-0 right-0 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50">
+            <div className="absolute top-full left-0 right-0 mt-2 bg-white border border-slate-200 rounded-xl shadow-lg overflow-hidden z-50">
               {results.length === 0 ? (
                 <div className="px-4 py-3 text-sm text-slate-400">Aucun résultat</div>
               ) : (
-                results.map((profile) => (
+                results.map((person) => (
                   <button
-                    key={profile.id}
-                    onClick={() => handleSelectProfile(profile.id)}
+                    key={person.id}
+                    onClick={() => {
+                      setShowDropdown(false);
+                      setQuery("");
+                      onViewProfile(person.id);
+                    }}
                     className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-left transition-colors"
                   >
                     <img
-                      src={profile.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=40&h=40&fit=crop&auto=format"}
-                      alt={profile.full_name || "Utilisateur"}
+                      src={person.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=40&h=40&fit=crop&auto=format"}
+                      alt={person.full_name || "Utilisateur"}
                       className="w-8 h-8 rounded-full object-cover"
                     />
                     <span className="text-sm font-medium text-slate-700">
-                      {profile.full_name || "Utilisateur"}
+                      {person.full_name || "Utilisateur sans nom"}
                     </span>
                   </button>
                 ))
