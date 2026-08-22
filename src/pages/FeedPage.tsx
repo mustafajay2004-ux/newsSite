@@ -5,11 +5,16 @@ import {
 } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
+interface FeedPageProps {
+  onViewProfile: (userId: string) => void;
+}
+
 interface Post {
   id: string;
   content: string;
   image_url: string | null;
   created_at: string;
+  user_id: string;
   profiles: {
     full_name: string | null;
     avatar_url: string | null;
@@ -71,11 +76,12 @@ interface PostCardProps {
   onAddComment: (postId: string, text: string) => void;
   onCopyLink: (postId: string) => void;
   onRepost: (post: Post) => void;
+  onViewProfile: (userId: string) => void;
 }
 
 function PostCard({
   post, likesCount, likedByMe, commentsCount, sharesCount, onToggleLike,
-  isExpanded, comments, onToggleComments, onAddComment, onCopyLink, onRepost,
+  isExpanded, comments, onToggleComments, onAddComment, onCopyLink, onRepost, onViewProfile,
 }: PostCardProps) {
   const [saved, setSaved] = useState(false);
   const [commentText, setCommentText] = useState("");
@@ -121,9 +127,13 @@ function PostCard({
       <div className="p-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <img src={authorAvatar} alt={authorName} className="w-11 h-11 rounded-xl object-cover" />
+            <button onClick={() => onViewProfile(post.user_id)}>
+              <img src={authorAvatar} alt={authorName} className="w-11 h-11 rounded-xl object-cover hover:opacity-80 transition-opacity" />
+            </button>
             <div>
-              <p className="font-semibold text-gray-900 text-sm">{authorName}</p>
+              <button onClick={() => onViewProfile(post.user_id)} className="font-semibold text-gray-900 text-sm hover:underline">
+                {authorName}
+              </button>
               <p className="text-xs text-slate-500">{authorRole} · {timeAgo(post.created_at)}</p>
             </div>
           </div>
@@ -139,7 +149,6 @@ function PostCard({
             <img src={post.image_url} alt="Publication" className="w-full h-48 object-cover" />
           </div>
         )}
-
       </div>
 
       <div className="px-6 py-3 flex items-center gap-6 relative">
@@ -255,7 +264,7 @@ function PostCard({
   );
 }
 
-export default function FeedPage() {
+export default function FeedPage({ onViewProfile }: FeedPageProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [likesByPost, setLikesByPost] = useState<Record<string, number>>({});
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
@@ -274,7 +283,7 @@ export default function FeedPage() {
 
     const { data: postsData } = await supabase
       .from("posts")
-      .select("id, content, image_url, created_at, profiles(full_name, avatar_url, role)")
+      .select("id, content, image_url, created_at, user_id, profiles(full_name, avatar_url, role)")
       .order("created_at", { ascending: false });
 
     const loadedPosts = (postsData as unknown as Post[]) || [];
@@ -498,6 +507,7 @@ export default function FeedPage() {
                   onAddComment={handleAddComment}
                   onCopyLink={handleCopyLink}
                   onRepost={handleRepost}
+                  onViewProfile={onViewProfile}
                 />
               ))
             )}
