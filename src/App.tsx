@@ -18,6 +18,7 @@ export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [activePage, setActivePage] = useState<Page>("feed");
+  const [viewedUserId, setViewedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -32,14 +33,26 @@ export default function App() {
     return () => subscription.unsubscribe();
   }, []);
 
+  function handleNavigate(page: Page) {
+    if (page === "profile") {
+      setViewedUserId(null);
+    }
+    setActivePage(page);
+  }
+
+  function handleViewProfile(userId: string) {
+    setViewedUserId(userId);
+    setActivePage("profile");
+  }
+
   const renderPage = () => {
     switch (activePage) {
-      case "feed": return <FeedPage />;
+      case "feed": return <FeedPage onViewProfile={handleViewProfile} />;
       case "groups": return <GroupsPage />;
       case "resources": return <ResourcesPage />;
       case "messages": return <MessagesPage />;
       case "notifications": return <NotificationsPage />;
-      case "profile": return <ProfilePage />;
+      case "profile": return <ProfilePage userId={viewedUserId} />;
       case "settings": return <SettingsPage />;
     }
   };
@@ -58,10 +71,10 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F8FAFC]">
-      <Topbar activePage={activePage} onNavigate={setActivePage} />
+      <Topbar activePage={activePage} onNavigate={handleNavigate} onViewProfile={handleViewProfile} />
       <div className="flex pt-16">
         {activePage !== "messages" && (
-          <Sidebar activePage={activePage} onNavigate={setActivePage} />
+          <Sidebar activePage={activePage} onNavigate={handleNavigate} />
         )}
         <main className={`flex-1 ${activePage !== "messages" ? "ml-64" : ""}`}>
           {renderPage()}
