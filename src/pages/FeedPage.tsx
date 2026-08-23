@@ -7,6 +7,7 @@ import { supabase } from "../lib/supabase";
 
 interface FeedPageProps {
   onViewProfile: (userId: string) => void;
+  onViewGroup: (groupId: string) => void;
 }
 
 interface Post {
@@ -275,7 +276,7 @@ function PostCard({
   );
 }
 
-export default function FeedPage({ onViewProfile }: FeedPageProps) {
+export default function FeedPage({ onViewProfile, onViewGroup }: FeedPageProps) {
   const [posts, setPosts] = useState<Post[]>([]);
   const [likesByPost, setLikesByPost] = useState<Record<string, number>>({});
   const [likedPostIds, setLikedPostIds] = useState<Set<string>>(new Set());
@@ -676,7 +677,7 @@ export default function FeedPage({ onViewProfile }: FeedPageProps) {
                   <p className="text-xs text-slate-400 px-2.5">Aucun groupe pour l'instant.</p>
                 ) : (
                   groups.map((g) => (
-                    <div key={g.id} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-all cursor-pointer">
+                    <div key={g.id} onClick={() => onViewGroup(g.id)} className="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50 transition-all cursor-pointer">
                       {g.photo_url ? (
                         <img src={g.photo_url} alt={g.name} className="w-9 h-9 rounded-xl object-cover shrink-0" />
                       ) : (
