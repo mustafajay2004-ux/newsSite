@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Users, LogOut, LogIn } from "lucide-react";
+import { ArrowLeft, Users, LogOut, LogIn, Star, Flag } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 interface GroupDetailPageProps {
@@ -30,6 +30,10 @@ export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProp
   const [isMember, setIsMember] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [isFavorite, setIsFavorite] = useState(false);
+  const [showReportForm, setShowReportForm] = useState(false);
+  const [reportReason, setReportReason] = useState("");
+  const [reportSent, setReportSent] = useState(false);
 
   async function load() {
     if (!groupId) {
@@ -61,6 +65,16 @@ export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProp
     setMembers(memberList);
     setIsMember(user ? memberList.some((m: Member) => m.id === user.id) : false);
 
+    if (user) {
+      const { data: favData } = await supabase
+        .from("group_favorites")
+        .select("id")
+        .eq("group_id", groupId)
+        .eq("user_id", user.id)
+        .maybeSingle();
+      setIsFavorite(!!favData);
+    }
+
     setLoading(false);
   }
 
@@ -82,6 +96,33 @@ export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProp
     await supabase.from("group_members").delete().eq("group_id", groupId).eq("user_id", currentUserId);
     setActionLoading(false);
     load();
+  }
+
+  async function toggleFavorite() {
+    if (!groupId || !currentUserId) return;
+
+    if (isFavorite) {
+      await supabase.from("group_favorites").delete().eq("group_id", groupId).eq("user_id", currentUserId);
+      setIsFavorite(false);
+    } else {
+      await supabase.from("group_favorites").insert({ group_id: groupId, user_id: currentUserId });
+      setIsFavorite(true);
+    }
+  }
+
+  async function submitReport() {
+    if (!groupId || !currentUserId) return;
+
+    await supabase.from("group_reports").insert({
+      group_id: groupId,
+      reported_by: currentUserId,
+      reason: reportReason.trim() || null,
+    });
+
+    setReportReason("");
+    setShowReportForm(false);
+    setReportSent(true);
+    setTimeout(() => setReportSent(false), 3000);
   }
 
   if (loading) {
