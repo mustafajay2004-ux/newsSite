@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react";
-import { ArrowLeft, Users, LogOut, LogIn, Star, Flag, Crown } from "lucide-react";
+import { useState, useEffect, useRef } from "react";
+import { ArrowLeft, Users, LogOut, LogIn, Star, Flag, Crown, Send, MessageSquare, Info } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 interface GroupDetailPageProps {
@@ -24,6 +24,17 @@ interface Member {
   is_admin: boolean;
 }
 
+interface GroupMessage {
+  id: string;
+  content: string;
+  created_at: string;
+  user_id: string;
+  profiles: {
+    full_name: string | null;
+    avatar_url: string | null;
+  } | null;
+}
+
 export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProps) {
   const [group, setGroup] = useState<GroupData | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -35,6 +46,11 @@ export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProp
   const [showReportForm, setShowReportForm] = useState(false);
   const [reportReason, setReportReason] = useState("");
   const [reportSent, setReportSent] = useState(false);
+  const [activeTab, setActiveTab] = useState<"infos" | "discussion">("infos");
+  const [messages, setMessages] = useState<GroupMessage[]>([]);
+  const [newMessage, setNewMessage] = useState("");
+  const [sendingMessage, setSendingMessage] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   async function load() {
     if (!groupId) {
@@ -79,9 +95,31 @@ export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProp
     setLoading(false);
   }
 
+  async function loadMessages() {
+    if (!groupId) return;
+
+    const { data } = await supabase
+      .from("group_messages")
+      .select("id, content, created_at, user_id, profiles(full_name, avatar_url)")
+      .eq("group_id", groupId)
+      .order("created_at", { ascending: true });
+
+    setMessages((data as unknown as GroupMessage[]) || []);
+  }
+
   useEffect(() => {
     load();
   }, [groupId]);
+
+  useEffect(() => {
+    if (activeTab === "discussion" && isMember) {
+      loadMessages();
+    }
+  }, [activeTab, isMember, groupId]);
+
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
 
   async function handleJoin() {
     if (!groupId || !currentUserId) return;
@@ -124,6 +162,21 @@ export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProp
     setShowReportForm(false);
     setReportSent(true);
     setTimeout(() => setReportSent(false), 3000);
+  }
+
+  async function handleSendMessage() {
+    if (!newMessage.trim() || !currentUserId || !groupId) return;
+    setSendingMessage(true);
+
+    await supabase.from("group_messages").insert({
+      group_id: groupId,
+      user_id: currentUserId,
+      content: newMessage.trim(),
+    });
+
+    setNewMessage("");
+    setSendingMessage(false);
+    loadMessages();
   }
 
   if (loading) {
@@ -217,31 +270,110 @@ export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProp
             </button>
           </div>
 
-          <div className="p-6">
-            <h2 className="text-sm font-bold text-gray-900 mb-4">Membres</h2>
-            <div className="space-y-3">
-              {members.map((m) => (
-                <div key={m.id} className="flex items-center gap-3">
-                  <img
-                    src={m.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=40&h=40&fit=crop&auto=format"}
-                    alt={m.full_name || "Utilisateur"}
-                    className="w-10 h-10 rounded-xl object-cover"
-                  />
-                  <div>
-                    <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
-                      {m.full_name || "Utilisateur"}
-                      {m.is_admin && (
-                        <span className="flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
-                          <Crown size={10} /> Admin
-                        </span>
-                      )}
-                    </p>
-                    <p className="text-xs text-slate-500">{m.role || "Étudiant"}</p>
-                  </div>
-                </div>
-              ))}
+          {isMember && (
+            <div className="flex border-b border-slate-100">
+              <button
+                onClick={() => setActiveTab("infos")}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold border-b-2 transition-all ${
+                  activeTab === "infos" ? "border-indigo-500 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <Info size={15} /> Infos
+              </button>
+              <button
+                onClick={() => setActiveTab("discussion")}
+                className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold border-b-2 transition-all ${
+                  activeTab === "discussion" ? "border-indigo-500 text-indigo-600" : "border-transparent text-slate-500 hover:text-slate-700"
+                }`}
+              >
+                <MessageSquare size={15} /> Discussion
+              </button>
             </div>
-          </div>
+          )}
+
+          {activeTab === "infos" && (
+            <div className="p-6">
+              <h2 className="text-sm font-bold text-gray-900 mb-4">Membres</h2>
+              <div className="space-y-3">
+                {members.map((m) => (
+                  <div key={m.id} className="flex items-center gap-3">
+                    <img
+                      src={m.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=40&h=40&fit=crop&auto=format"}
+                      alt={m.full_name || "Utilisateur"}
+                      className="w-10 h-10 rounded-xl object-cover"
+                    />
+                    <div>
+                      <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                        {m.full_name || "Utilisateur"}
+                        {m.is_admin && (
+                          <span className="flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                            <Crown size={10} /> Admin
+                          </span>
+                        )}
+                      </p>
+                      <p className="text-xs text-slate-500">{m.role || "Étudiant"}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeTab === "discussion" && isMember && (
+            <div className="flex flex-col h-[420px]">
+              <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                {messages.length === 0 ? (
+                  <p className="text-center text-xs text-slate-400 mt-8">Aucun message pour l'instant. Lancez la discussion !</p>
+                ) : (
+                  messages.map((msg) => {
+                    const isMe = msg.user_id === currentUserId;
+                    return (
+                      <div key={msg.id} className={`flex items-end gap-2 ${isMe ? "justify-end" : "justify-start"}`}>
+                        {!isMe && (
+                          <img
+                            src={msg.profiles?.avatar_url || "https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=40&h=40&fit=crop&auto=format"}
+                            alt={msg.profiles?.full_name || "Utilisateur"}
+                            className="w-7 h-7 rounded-full object-cover shrink-0"
+                          />
+                        )}
+                        <div className={`max-w-[70%] ${isMe ? "items-end" : "items-start"} flex flex-col`}>
+                          {!isMe && (
+                            <span className="text-[11px] text-slate-400 mb-0.5 ml-1">{msg.profiles?.full_name || "Utilisateur"}</span>
+                          )}
+                          <div
+                            className={`px-3 py-2 rounded-2xl text-sm ${
+                              isMe ? "bg-indigo-500 text-white rounded-br-sm" : "bg-slate-100 text-slate-700 rounded-bl-sm"
+                            }`}
+                          >
+                            {msg.content}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+
+              <div className="p-3 border-t border-slate-100 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleSendMessage()}
+                  placeholder="Écrire un message..."
+                  className="flex-1 h-10 px-3.5 bg-slate-50 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-400"
+                />
+                <button
+                  onClick={handleSendMessage}
+                  disabled={sendingMessage || !newMessage.trim()}
+                  className="w-10 h-10 rounded-xl bg-indigo-500 hover:bg-indigo-600 text-white flex items-center justify-center disabled:opacity-50 transition-all"
+                >
+                  <Send size={16} />
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </div>
