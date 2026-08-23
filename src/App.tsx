@@ -10,15 +10,17 @@ import ResourcesPage from "./pages/ResourcesPage";
 import MessagesPage from "./pages/MessagesPage";
 import NotificationsPage from "./pages/NotificationsPage";
 import ProfilePage from "./pages/ProfilePage";
+import GroupDetailPage from "./pages/GroupDetailPage";
 import SettingsPage from "./pages/SettingsPage";
 
-export type Page = "feed" | "groups" | "resources" | "messages" | "notifications" | "profile" | "settings";
+export type Page = "feed" | "groups" | "resources" | "messages" | "notifications" | "profile" | "settings" | "groupdetail";
 
 export default function App() {
   const [session, setSession] = useState<Session | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [activePage, setActivePage] = useState<Page>("feed");
   const [viewedUserId, setViewedUserId] = useState<string | null>(null);
+  const [viewedGroupId, setViewedGroupId] = useState<string | null>(null);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -45,15 +47,21 @@ export default function App() {
     setActivePage("profile");
   }
 
+  function handleViewGroup(groupId: string) {
+    setViewedGroupId(groupId);
+    setActivePage("groupdetail");
+  }
+
   const renderPage = () => {
     switch (activePage) {
-      case "feed": return <FeedPage onViewProfile={handleViewProfile} />;
+      case "feed": return <FeedPage onViewProfile={handleViewProfile} onViewGroup={handleViewGroup} />;
       case "groups": return <GroupsPage />;
       case "resources": return <ResourcesPage />;
       case "messages": return <MessagesPage />;
       case "notifications": return <NotificationsPage />;
       case "profile": return <ProfilePage userId={viewedUserId} />;
       case "settings": return <SettingsPage />;
+      case "groupdetail": return <GroupDetailPage groupId={viewedGroupId} onBack={() => handleNavigate("feed")} />;
     }
   };
 
