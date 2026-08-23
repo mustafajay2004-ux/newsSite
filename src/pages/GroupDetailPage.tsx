@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { ArrowLeft, Users, LogOut, LogIn, Star, Flag } from "lucide-react";
+import { ArrowLeft, Users, LogOut, LogIn, Star, Flag, Crown } from "lucide-react";
 import { supabase } from "../lib/supabase";
 
 interface GroupDetailPageProps {
@@ -21,6 +21,7 @@ interface Member {
   full_name: string | null;
   avatar_url: string | null;
   role: string | null;
+  is_admin: boolean;
 }
 
 export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProps) {
@@ -55,12 +56,12 @@ export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProp
 
     const { data: membersData } = await supabase
       .from("group_members")
-      .select("profiles(id, full_name, avatar_url, role)")
+      .select("is_admin, profiles(id, full_name, avatar_url, role)")
       .eq("group_id", groupId);
 
     const memberList = (membersData || [])
-      .map((m: any) => m.profiles)
-      .filter((p: any) => p !== null);
+      .filter((m: any) => m.profiles !== null)
+      .map((m: any) => ({ ...m.profiles, is_admin: m.is_admin }));
 
     setMembers(memberList);
     setIsMember(user ? memberList.some((m: Member) => m.id === user.id) : false);
@@ -227,7 +228,14 @@ export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProp
                     className="w-10 h-10 rounded-xl object-cover"
                   />
                   <div>
-                    <p className="text-sm font-semibold text-gray-900">{m.full_name || "Utilisateur"}</p>
+                    <p className="text-sm font-semibold text-gray-900 flex items-center gap-1.5">
+                      {m.full_name || "Utilisateur"}
+                      {m.is_admin && (
+                        <span className="flex items-center gap-1 text-[10px] font-semibold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded">
+                          <Crown size={10} /> Admin
+                        </span>
+                      )}
+                    </p>
                     <p className="text-xs text-slate-500">{m.role || "Étudiant"}</p>
                   </div>
                 </div>
