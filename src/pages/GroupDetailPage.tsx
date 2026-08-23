@@ -143,8 +143,50 @@ export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProp
           <ArrowLeft size={16} /> Retour
         </button>
 
+        {reportSent && (
+          <div className="mb-4 px-4 py-2.5 bg-green-50 text-green-700 text-sm rounded-xl">
+            Signalement envoyé, merci.
+          </div>
+        )}
+
         <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-          <div className="p-6 flex flex-col items-center text-center border-b border-slate-100">
+          <div className="p-6 flex flex-col items-center text-center border-b border-slate-100 relative">
+            <div className="absolute top-4 right-4 flex items-center gap-1">
+              <button
+                onClick={toggleFavorite}
+                title={isFavorite ? "Retirer des favoris" : "Ajouter aux favoris"}
+                className={`p-2 rounded-full transition-all ${
+                  isFavorite ? "text-amber-500 bg-amber-50" : "text-slate-300 hover:bg-slate-100 hover:text-amber-500"
+                }`}
+              >
+                <Star size={18} fill={isFavorite ? "currentColor" : "none"} />
+              </button>
+              <button
+                onClick={() => setShowReportForm(!showReportForm)}
+                title="Signaler ce groupe"
+                className="p-2 rounded-full text-slate-300 hover:bg-slate-100 hover:text-red-500 transition-all"
+              >
+                <Flag size={18} />
+              </button>
+            </div>
+
+            {showReportForm && (
+              <div className="absolute top-14 right-4 w-64 bg-white border border-slate-200 rounded-xl shadow-lg p-3 z-10 text-left">
+                <p className="text-xs font-semibold text-gray-900 mb-2">Signaler ce groupe</p>
+                <textarea
+                  value={reportReason}
+                  onChange={(e) => setReportReason(e.target.value)}
+                  placeholder="Raison (optionnel)"
+                  className="w-full min-h-[60px] px-2.5 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs resize-none focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-400"
+                />
+                <button
+                  onClick={submitReport}
+                  className="w-full mt-2 h-8 rounded-lg bg-red-500 hover:bg-red-600 text-white text-xs font-semibold transition-all"
+                >
+                  Envoyer le signalement
+                </button>
+              </div>
+            )}
             {group.photo_url ? (
               <img src={group.photo_url} alt={group.name} className="w-24 h-24 rounded-2xl object-cover mb-4" />
             ) : (
