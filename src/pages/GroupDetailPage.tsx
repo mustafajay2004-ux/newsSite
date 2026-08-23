@@ -35,6 +35,10 @@ interface GroupMessage {
   } | null;
 }
 
+function formatMessageTime(dateString: string): string {
+  return new Date(dateString).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+}
+
 export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProps) {
   const [group, setGroup] = useState<GroupData | null>(null);
   const [members, setMembers] = useState<Member[]>([]);
@@ -347,6 +351,9 @@ export default function GroupDetailPage({ groupId, onBack }: GroupDetailPageProp
                           >
                             {msg.content}
                           </div>
+                          <span className={`text-[10px] text-slate-400 mt-0.5 ${isMe ? "mr-1" : "ml-1"}`}>
+                            {formatMessageTime(msg.created_at)}
+                          </span>
                         </div>
                       </div>
                     );
